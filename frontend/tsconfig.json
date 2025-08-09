@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    // You can add other compiler options you already have here
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "~backend/*": ["./src/encore/*"] 
+    }
+  },
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}

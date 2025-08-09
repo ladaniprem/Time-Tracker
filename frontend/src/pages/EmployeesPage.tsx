@@ -1,0 +1,149 @@
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import backend from '~backend/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+import EmployeeForm from '../components/EmployeeForm';
+import { Plus, Search, Users, Mail, Phone } from 'lucide-react';
+import type { CreateEmployeeRequest } from '~backend/attendance/create_employee';
+
+export default function EmployeesPage() {
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const queryClient = useQueryClient();
+
+  const { data: employeesData, isLoading } = useQuery({
+    queryKey: ['employees'],
+    queryFn: () => backend.attendance.listEmployees({}),
+  });
+
+  const createEmployeeMutation = useMutation({
+    mutationFn: (data: CreateEmployeeRequest) => backend.attendance.createEmployee(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      setIsFormOpen(false);
+      toast({
+        title: "Employee created",
+        description: "New employee has been added successfully.",
+      });
+    },
+    onError: (error) => {
+      console.error('Failed to create employee:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create employee. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const filteredEmployees = employeesData?.employees.filter(employee =>
+    employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    employee.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    employee.email.toLowerCase().includes(searchTerm.toLowerCase())
+  ) || [];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-foreground">Employees</h1>
+        <Button onClick={() => setIsFormOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Employee
+        </Button>
+      </div>
+
+      <div className="flex items-center space-x-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search employees..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+          <Users className="h-4 w-4" />
+          <span>{employeesData?.total || 0} employees</span>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="h-48 bg-muted animate-pulse rounded-lg" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredEmployees.map((employee) => (
+            <Card key={employee.id} className="hover:shadow-md transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">{employee.name}</CardTitle>
+                  <Badge variant="secondary">{employee.employeeId}</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center space-x-2 text-sm">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">{employee.email}</span>
+                </div>
+                
+                {employee.phone && (
+                  <div className="flex items-center space-x-2 text-sm">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">{employee.phone}</span>
+                  </div>
+                )}
+                
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {employee.department && (
+                    <Badge variant="outline">{employee.department}</Badge>
+                  )}
+                  {employee.position && (
+                    <Badge variant="outline">{employee.position}</Badge>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {!isLoading && filteredEmployees.length === 0 && (
+        <div className="text-center py-12">
+          <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-foreground mb-2">
+            {searchTerm ? 'No employees found' : 'No employees yet'}
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            {searchTerm 
+              ? 'Try adjusting your search terms'
+              : 'Get started by adding your first employee'
+            }
+          </p>
+          {!searchTerm && (
+            <Button onClick={() => setIsFormOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Employee
+            </Button>
+          )}
+        </div>
+      )}
+
+      <EmployeeForm
+        open={isFormOpen}
+        onOpenChange={setIsFormOpen}
+        onSubmit={(data) => createEmployeeMutation.mutate(data)}
+        isLoading={createEmployeeMutation.isPending}
+      />
+    </div>
+  );
+}
+
+

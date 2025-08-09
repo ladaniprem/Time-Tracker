@@ -1,0 +1,14 @@
+import * as runtime from "../../internal/runtime/mod.js";
+export declare class ObjectsError extends Error {
+    constructor(msg: string);
+}
+export declare class ObjectNotFound extends ObjectsError {
+    constructor(msg: string);
+}
+export declare class PreconditionFailed extends ObjectsError {
+    constructor(msg: string);
+}
+export declare class InvalidArgument extends ObjectsError {
+    constructor(msg: string);
+}
+export declare function unwrapErr<T>(val: T | runtime.TypedObjectError): T;
