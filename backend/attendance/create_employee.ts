@@ -1,7 +1,5 @@
 import { api } from "encore.dev/api";
-
-
-import { attendanceDB } from "./db";
+import { db as attendanceDB } from "./db";
 
 export interface CreateEmployeeRequest {
   employeeId: string;

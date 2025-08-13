@@ -1,5 +1,5 @@
 import { api } from "encore.dev/api";
-import { attendanceDB } from "../attendance/db";
+import { db as attendanceDB } from "../attendance/db";
 
 export interface AttendanceSettings {
   id: number;
