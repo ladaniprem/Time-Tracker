@@ -25,7 +25,7 @@ export default function AttendancePage() {
   const { data: attendanceData, isLoading } = useQuery({
     queryKey: ["attendance", dateFilter],
     queryFn: () =>
-      backend.listAttendance({
+      backend.attendance.listAttendance({
         startDate: dateFilter || undefined,
         endDate: dateFilter || undefined,
       }),
@@ -40,23 +40,18 @@ export default function AttendancePage() {
   // Record attendance mutation
   const recordAttendanceMutation = useMutation({
     mutationFn: (data: RecordAttendanceRequest) =>
-      backend.recordAttendance(data),
+      backend.attendance.recordAttendance(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["attendance"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       setIsFormOpen(false);
       toast.success("Attendance has been recorded successfully.");
     },
-    onError: (error) => {
-      console.error("Failed to record attendance:", error);
-      toast.error("Failed to record attendance. Please try again.");
-    },
   });
 
-  // Get user attendance mutation
   const getUserAttendanceMutation = useMutation({
     mutationFn: (data: { employeeId: string; date: string }) =>
-      backend.attendance.getUserAttendance(data),
+      backend.attendance.getAttendance(data),
     onSuccess: (data) => {
       setUserAttendanceResult((data as { message: string }).message);
       if ((data as { success: boolean }).success) {

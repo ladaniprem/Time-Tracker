@@ -54,6 +54,9 @@ export default {
   attendance: {
     createEmployee: async (data: any) => ({ ...data, id: 1, createdAt: new Date(), updatedAt: new Date() }),
     listEmployees: async () => ({ employees: [], total: 0 }),
+    listAttendance: async (data: any) => ({ records: [], total: 0 }), // Mock implementation
+    recordAttendance: async (data: any) => ({ success: true, message: "Mock attendance recorded" }), // Mock implementation
+    getAttendance: async (data: any) => ({ success: true, message: "Mock attendance retrieved" }), // Mock implementation
   },
   settings: {
     getAttendanceSettings: async () => ({ // Mock implementation, replace with actual call

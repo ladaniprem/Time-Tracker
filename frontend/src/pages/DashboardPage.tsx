@@ -12,7 +12,7 @@ export default function DashboardPage() {
 
   const { data: recentAttendance } = useQuery({
     queryKey: ['recent-attendance'],
-    queryFn: () => backend.listAttendance({ limit: 5 }),
+    queryFn: () => backend.attendance.listAttendance({ limit: 5 }),
   });
 
   if (isLoading) {

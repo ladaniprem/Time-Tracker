@@ -31,7 +31,7 @@ export const uploadAttendanceFile = api<UploadAttendanceFileRequest, UploadAtten
       const fileBuffer = Uint8Array.from(atob(req.fileContent), c => c.charCodeAt(0));
       
       // Upload to bucket
-      const result = await attendanceFilesBucket.upload(fileName, fileBuffer, {
+      const result = await attendanceFilesBucket.upload(fileName, Buffer.from(fileBuffer), {
         contentType: req.fileType
       });
       

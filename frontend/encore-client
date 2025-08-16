@@ -152,6 +152,16 @@ export namespace attendance {
         updatedAt: string
     }
 
+    export interface GetUserAttendanceRequest {
+        employeeId: string
+        date: string
+    }
+
+    export interface GetUserAttendanceResponse {
+        success: boolean
+        message: string
+    }
+
     export interface ListAttendanceRequest {
         employeeId?: number
         startDate?: string
@@ -190,8 +200,10 @@ export namespace attendance {
             this.baseClient = baseClient
             this.createEmployee = this.createEmployee.bind(this)
             this.getDashboardStats = this.getDashboardStats.bind(this)
+            this.getUserAttendance = this.getUserAttendance.bind(this)
             this.listAttendance = this.listAttendance.bind(this)
             this.listEmployees = this.listEmployees.bind(this)
+            this.processAttendanceFiles = this.processAttendanceFiles.bind(this)
             this.recordAttendance = this.recordAttendance.bind(this)
         }
 
@@ -211,6 +223,12 @@ export namespace attendance {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI("GET", `/dashboard/stats`)
             return await resp.json() as DashboardStats
+        }
+
+        public async getUserAttendance(params: GetUserAttendanceRequest): Promise<GetUserAttendanceResponse> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("POST", `/attendance/user`, JSON.stringify(params))
+            return await resp.json() as GetUserAttendanceResponse
         }
 
         /**
@@ -245,6 +263,35 @@ export namespace attendance {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI("GET", `/employees`, undefined, {query})
             return await resp.json() as ListEmployeesResponse
+        }
+
+        /**
+         * --- Main API ---
+         */
+        public async processAttendanceFiles(): Promise<{
+    /**
+     * --- Main API ---
+     */
+    success: boolean
+
+    /**
+     * --- Main API ---
+     */
+    message: string
+}> {
+            // Now make the actual call to the API
+            const resp = await this.baseClient.callTypedAPI("POST", `/attendance/process-files`)
+            return await resp.json() as {
+    /**
+     * --- Main API ---
+     */
+    success: boolean
+
+    /**
+     * --- Main API ---
+     */
+    message: string
+}
         }
 
         /**
@@ -466,7 +513,6 @@ export namespace notification {
 
     export interface SendEmailResponse {
         success: boolean
-        messageId?: string
         error?: string
     }
 
@@ -491,9 +537,6 @@ export namespace notification {
             this.sendWhatsApp = this.sendWhatsApp.bind(this)
         }
 
-        /**
-         * Sends an email notification using SMTP configuration.
-         */
         public async sendEmail(params: SendEmailRequest): Promise<SendEmailResponse> {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI("POST", `/notifications/email`, JSON.stringify(params))
@@ -501,7 +544,7 @@ export namespace notification {
         }
 
         /**
-         * Sends a WhatsApp notification using Interakt API.
+         * Simulates sending WhatsApp message
          */
         public async sendWhatsApp(params: SendWhatsAppRequest): Promise<SendWhatsAppResponse> {
             // Now make the actual call to the API
@@ -541,6 +584,9 @@ export namespace realtime {
             this.broadcastAttendanceUpdate = this.broadcastAttendanceUpdate.bind(this)
         }
 
+        /**
+         * SSE endpoint for clients to subscribe to attendance updates.
+         */
         public async attendanceUpdates(params: RealtimeHandshake): Promise<StreamIn<AttendanceUpdate>> {
             // Convert our params into the objects we need for the request
             const query = makeRecord<string, string | string[]>({
@@ -550,12 +596,21 @@ export namespace realtime {
             return await this.baseClient.createStreamIn(`/realtime/attendance`, {query})
         }
 
+        /**
+         * Broadcast endpoint: send an update to all connected clients.
+         */
         public async broadcastAttendanceUpdate(params: AttendanceUpdate): Promise<{
+    /**
+     * Broadcast endpoint: send an update to all connected clients.
+     */
     success: boolean
 }> {
             // Now make the actual call to the API
             const resp = await this.baseClient.callTypedAPI("POST", `/realtime/broadcast`, JSON.stringify(params))
             return await resp.json() as {
+    /**
+     * Broadcast endpoint: send an update to all connected clients.
+     */
     success: boolean
 }
         }

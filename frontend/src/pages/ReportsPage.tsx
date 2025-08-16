@@ -49,7 +49,7 @@ export default function ReportsPage() {
   const { data: attendanceData, isLoading } = useQuery({
     queryKey: ["attendance-report", startDate, endDate],
     queryFn: (): Promise<{ records: AttendanceRecord[] }> =>
-      backend.listAttendance({
+      backend.attendance.listAttendance({
         startDate: startDate || undefined,
         endDate: endDate || undefined,
       }),
@@ -58,7 +58,7 @@ export default function ReportsPage() {
 
   useQuery({
     queryKey: ["dashboard-stats"],
-    queryFn: () => backend.getDashboardStats(),
+    queryFn: () => backend.attendance.getAttendance({ type: 'dashboard' }),
   });
 
   // Calculate report metrics

@@ -87,3 +87,4 @@ export const syncData = api<SyncDataRequest, SyncDataResponse>(
     }
   }
 );
+
