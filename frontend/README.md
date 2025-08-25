@@ -1,43 +1,59 @@
-# React + TypeScript + Vite
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+# Frontend - AttendanceHub
 
-Currently, two official plugins are available:
+## Overview
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+AttendanceHub's frontend is built using React and Vite, providing a fast and modern user experience. It connects to the Encore backend via auto-generated TypeScript clients for seamless API integration.
 
-## Expanding the ESLint configuration
+## Technologies Used
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **React**: UI library for building interactive interfaces
+- **Vite**: Fast build tool and development server
+- **TypeScript**: Type-safe development
+- **Encore Client**: Auto-generated API client for backend communication
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Encore Integration
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+Encore generates TypeScript clients for backend APIs. The `encore-client.ts` file in the frontend imports these clients, allowing you to call backend endpoints directly from React components.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Example Usage
+
+```ts
+import { attendance, employees } from './encore-client';
+
+// Fetch attendance records
+attendance.list_attendance().then(data => {
+  // handle data
+});
 ```
+
+## How to Run
+
+1. Install dependencies:
+
+  ```sh
+  npm install
+  ```
+
+2. Start the development server:
+
+  ```sh
+  npm run dev
+  ```
+
+## Project Structure
+
+- `src/` - Main source code
+- `public/` - Static assets
+- `encore-client.ts` - Auto-generated Encore API client
+
+## Customization
+
+- Theme and date formatting options are configured in `src/config.ts`.
+- UI components are in `src/components/`.
+
+---
+For more details on Encore, see the backend README.
 
 You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
