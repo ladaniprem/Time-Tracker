@@ -122,10 +122,10 @@ export default function Sidebar() {
                 key={item.name}
                 to={item.href}
                 className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200",
+                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 w-full",
                   isActive
                     ? "bg-muted text-white"
-                    : "text-muted-foreground hover:bg-muted hover:text-white"
+                    : "text-muted-foreground hover:bg-white hover:text-black"
                 )}
               >
                 <item.icon
@@ -133,7 +133,7 @@ export default function Sidebar() {
                     "h-5 w-5 transition-colors duration-200",
                     isActive
                       ? "text-white"
-                      : "text-muted-foreground group-hover:text-white"
+                      : "text-muted-foreground group-hover:text-black"
                   )}
                 />
                 <span>{item.name}</span>

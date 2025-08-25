@@ -33,27 +33,28 @@ export interface UpdateSystemSettingsRequest {
 }
 
 // Retrieves current system settings.
+let currentSettings: SystemSettings = {
+  companyName: " Corp",
+  companyLogo: "",
+  timezone: "UTC",
+  dateFormat: "MM/DD/YYYY",
+  timeFormat: "12h",
+  currency: "USD",
+  language: "en",
+  emailNotifications: true,
+  smsNotifications: false,
+  whatsappNotifications: true,
+  autoBackup: true,
+  backupFrequency: "daily",
+  dataRetentionDays: 365,
+};
+
+export const getCurrentSystemSettings = (): SystemSettings => currentSettings;
+
 export const getSystemSettings = api<void, SystemSettings>(
   { expose: true, method: "GET", path: "/settings/system" },
   async () => {
-    // In a real implementation, these would be stored in the database
-    const settings: SystemSettings = {
-      companyName: " Corp",
-      companyLogo: "",
-      timezone: "UTC",
-      dateFormat: "MM/DD/YYYY",
-      timeFormat: "12h",
-      currency: "USD",
-      language: "en",
-      emailNotifications: true,
-      smsNotifications: false,
-      whatsappNotifications: true,
-      autoBackup: true,
-      backupFrequency: "daily",
-      dataRetentionDays: 365
-    };
-
-    return settings;
+    return currentSettings;
   }
 );
 
@@ -61,9 +62,8 @@ export const getSystemSettings = api<void, SystemSettings>(
 export const updateSystemSettings = api<UpdateSystemSettingsRequest, SystemSettings>(
   { expose: true, method: "PUT", path: "/settings/system" },
   async (req) => {
-    // In a real implementation, you would update these in the database
-    console.log("Updating system settings:", req);
-    
-    return req;
+    // Persist in-memory for runtime checks
+    currentSettings = { ...req };
+    return currentSettings;
   }
 );

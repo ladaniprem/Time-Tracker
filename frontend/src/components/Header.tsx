@@ -21,8 +21,9 @@ import { useTheme } from '../contexts/ThemeContext';
 import ProfileForm from './ProfileForm';
 import {  LogOut, User, Settings, Bell, Palette } from 'lucide-react';
 import { toast } from 'sonner'; 
-import backend from '../../../backend/client';
-import type { UpdateProfileRequest } from '../../../backend/auth/profile';
+import backend from '../backend';
+import type { auth } from '../../encore-client';
+type UpdateProfileRequest = auth.UpdateProfileRequest;
 
 export default function Header() {
   const navigate = useNavigate();
@@ -93,7 +94,7 @@ export default function Header() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="h-9 w-9 border-none">
+              <Button variant="outline" size="icon" className="h-9 w-9 border-none hover:bg-white hover:text-black">
                 <Palette className="h-4 w-4 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
@@ -112,7 +113,7 @@ export default function Header() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="relative h-9 rounded-full border-none bg-muted/50 px-2 pl-1">
+              <Button variant="outline" className="relative h-9 rounded-full border-none bg-muted/50 px-2 pl-1 hover:bg-white hover:text-black">
                 <Avatar className="h-7 w-7 mr-2">
                   <AvatarImage src={undefined} />
                   <AvatarFallback className="bg-primary/10 text-primary">

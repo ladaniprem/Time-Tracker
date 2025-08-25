@@ -278,6 +278,7 @@
 // // }
 
 import { useEffect, useState } from 'react';
+import { BASE_URL } from '../backend';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -306,7 +307,7 @@ export default function RealtimeUpdates() {
     const connectToStream = () => {
       try {
         eventSource = new EventSource(
-          'http://localhost:4000/realtime/attendance?userId=123'
+          `${BASE_URL}/realtime/attendance?userId=123`
         );
 
         eventSource.onopen = () => {

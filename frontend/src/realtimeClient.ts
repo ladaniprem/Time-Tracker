@@ -24,8 +24,9 @@
 
 // Client-side code to connect to Encore SSE stream
 
-// Replace localhost:4000 with your Encore dev URL if needed
-const es = new EventSource("http://localhost:4000/realtime/attendance?userId=123");
+import { BASE_URL } from './backend';
+// Use configured Encore base URL
+const es = new EventSource(`${BASE_URL}/realtime/attendance?userId=123`);
 
 es.onmessage = (e: MessageEvent) => {
   try {

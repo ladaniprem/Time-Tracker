@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import backend from "../../../backend/client";
+import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
+import backend from "../backend";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,9 +15,9 @@ type AttendanceRecord = {
   employeeName: string;
   employeeCode: string;
   date: string;
-  inTime: string | null;
-  outTime: string | null;
-  totalHours?: number;
+  inTime?: string | null;
+  outTime?: string | null;
+  totalHours?: number | null;
   lateMinutes: number;
 };
 
@@ -46,26 +46,54 @@ export default function ReportsPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
-  const { data: attendanceData, isLoading } = useQuery({
+  const {
+    data: attendancePages,
+    isLoading,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ["attendance-report", startDate, endDate],
-    queryFn: (): Promise<{ records: AttendanceRecord[] }> =>
+    initialPageParam: { offset: 0, limit: 50 },
+    queryFn: ({ pageParam }) =>
       backend.attendance.listAttendance({
         startDate: startDate || undefined,
         endDate: endDate || undefined,
+        limit: (pageParam as { limit: number }).limit,
+        offset: (pageParam as { offset: number }).offset,
       }),
-    enabled: !!(startDate && endDate),
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((sum: number, p: any) => sum + (p?.records?.length || 0), 0);
+      const total = (lastPage as any)?.total || 0;
+      if (loaded >= total) return undefined;
+      return { offset: loaded, limit: 50 };
+    },
   });
+
+  const loadAll = async () => {
+    // Fetch until all pages are loaded
+    // Guard to avoid infinite loop if state changes mid-way
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const canLoad = (hasNextPage && !isFetchingNextPage);
+      if (!canLoad) break;
+      // eslint-disable-next-line no-await-in-loop
+      await fetchNextPage();
+    }
+  };
 
   useQuery({
     queryKey: ["dashboard-stats"],
-    queryFn: () => backend.attendance.getAttendance({ type: 'dashboard' }),
+    queryFn: () => backend.attendance.getDashboardStats(),
   });
 
   // Calculate report metrics
-  const reportMetrics = React.useMemo<ReportMetrics | null>(() => {
-    if (!attendanceData?.records) return null;
+  const flatRecords: AttendanceRecord[] = (attendancePages?.pages || []).flatMap((p: any) => p?.records || []);
 
-    const records = attendanceData.records;
+  const reportMetrics = React.useMemo<ReportMetrics | null>(() => {
+    if (!flatRecords || flatRecords.length === 0) return null;
+
+    const records = flatRecords;
     const totalRecords = records.length;
     const presentRecords = records.filter((r) => r.inTime).length;
     const lateRecords = records.filter((r) => r.lateMinutes > 0).length;
@@ -111,10 +139,10 @@ export default function ReportsPage() {
           : 0,
       employeeStats: Object.values(employeeStatsMap),
     };
-  }, [attendanceData]);
+  }, [attendancePages]);
 
   const handleExport = () => {
-    if (!attendanceData?.records) return;
+    if (!flatRecords || flatRecords.length === 0) return;
 
     const headers = [
       "Employee Name",
@@ -124,11 +152,12 @@ export default function ReportsPage() {
       "Check Out",
       "Total Hours",
       "Late Minutes",
-      "Status",
+      "Status", // Late/On Time/Absent
+      "Attendance", // Present/Absent
     ];
     const csvContent = [
       headers.join(","),
-      ...attendanceData.records.map((record) =>
+      ...flatRecords.map((record) =>
         [
           record.employeeName,
           record.employeeCode,
@@ -142,6 +171,7 @@ export default function ReportsPage() {
               ? "Late"
               : "On Time"
             : "Absent",
+          record.inTime ? "Present" : "Absent",
         ].join(",")
       ),
     ].join("\n");
@@ -150,7 +180,7 @@ export default function ReportsPage() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `attendance-report-${startDate}-to-${endDate}.csv`;
+    a.download = `attendance-report-${startDate || 'all'}-to-${endDate || 'all'}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
   };
@@ -195,6 +225,20 @@ export default function ReportsPage() {
                 onChange={(e) => setEndDate(e.target.value)}
               />
             </div>
+            <Button
+              onClick={() => fetchNextPage()}
+              disabled={!hasNextPage || isFetchingNextPage}
+              variant="secondary"
+            >
+              {isFetchingNextPage ? "Loading..." : hasNextPage ? "Load More" : "All Loaded"}
+            </Button>
+            <Button
+              onClick={loadAll}
+              disabled={!hasNextPage || isFetchingNextPage}
+              variant="secondary"
+            >
+              {isFetchingNextPage ? "Loading..." : "Load All"}
+            </Button>
             <Button
               onClick={handleExport}
               disabled={!reportMetrics}

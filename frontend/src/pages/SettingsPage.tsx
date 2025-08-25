@@ -9,9 +9,10 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner'; // Correct import for Sonner
 import { Settings, Clock, Globe, Bell, Shield } from 'lucide-react';
-import backend from '../../../backend/client';
-import type { UpdateAttendanceSettingsRequest } from '../../../backend/settings/attendance_settings';
-import type { UpdateSystemSettingsRequest } from '../../../backend/settings/system_settings';
+import backend from '../backend';
+import type { settings } from '../../encore-client';
+type UpdateAttendanceSettingsRequest = settings.UpdateAttendanceSettingsRequest;
+type UpdateSystemSettingsRequest = settings.UpdateSystemSettingsRequest;
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();

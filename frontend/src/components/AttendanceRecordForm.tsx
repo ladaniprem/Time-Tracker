@@ -177,10 +177,11 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "sonner"; 
-import backend from "../../../backend/client";
+import backend from "../backend";
 
-import type { RecordAttendanceRequest } from "../../../backend/attendance/record_attendance";
-import type { Employee } from "../../../backend/attendance/create_employee";
+import type { attendance } from "../../encore-client";
+type RecordAttendanceRequest = attendance.RecordAttendanceRequest;
+type Employee = attendance.Employee;
 
 interface AttendanceRecordFormProps {
   open: boolean;

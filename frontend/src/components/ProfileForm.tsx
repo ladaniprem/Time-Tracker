@@ -15,7 +15,9 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Camera, Loader2, Building2, Phone, Briefcase } from 'lucide-react';
-import type { UpdateProfileRequest, UserProfile } from '../../../backend/auth/profile';
+import type { auth } from '../../encore-client';
+type UpdateProfileRequest = auth.UpdateProfileRequest;
+type UserProfile = auth.UserProfile;
 
 
 interface ProfileFormProps {

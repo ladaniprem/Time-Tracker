@@ -264,9 +264,8 @@ export interface AttendanceSettings extends UpdateAttendanceSettingsRequest {
 }
 
 // =====================
-// DB Connection
+// DB Connection: use db directly
 // =====================
-const attendanceDB = db;
 
 // =====================
 // Update Attendance Settings
@@ -277,7 +276,7 @@ export const updateAttendanceSettings = api<
 >(
   { expose: true, method: "PUT", path: "/settings/attendance" },
   async (req: UpdateAttendanceSettingsRequest): Promise<AttendanceSettings> => {
-    const result = await attendanceDB.queryRow<AttendanceSettings>`
+    const result = await db.queryRow<AttendanceSettings>`
       UPDATE attendance_settings
       SET work_start_time = ${req.workStartTime}::time,
           work_end_time = ${req.workEndTime}::time,
@@ -304,7 +303,9 @@ export const updateAttendanceSettings = api<
                 break_duration_minutes as "breakDurationMinutes",
                 updated_at as "updatedAt"
     `;
-
+    if (!result) {
+      throw new Error("Failed to update attendance settings");
+    }
     return result;
   }
 );
@@ -315,7 +316,7 @@ export const updateAttendanceSettings = api<
 export const getAttendanceSettings = api<{}, AttendanceSettings>(
   { expose: true, method: "GET", path: "/settings/attendance" },
   async () => {
-    return await attendanceDB.queryRow<AttendanceSettings>`
+    const result = await db.queryRow<AttendanceSettings>`
       SELECT id,
              work_start_time as "workStartTime",
              work_end_time::time as "workEndTime",
@@ -331,5 +332,9 @@ export const getAttendanceSettings = api<{}, AttendanceSettings>(
       FROM attendance_settings
       WHERE id = 1
     `;
+    if (!result) {
+      throw new Error("Attendance settings not found");
+    }
+    return result;
   }
 );

@@ -127,6 +127,9 @@
 
 import { api } from "encore.dev/api";
 import { db } from "./db";
+import { sendEmailIfEnabled } from "../notification/send_email";
+import { sendWhatsAppIfEnabled } from "../notification/send_whatsapp";
+import { getCurrentSystemSettings } from "../settings/system_settings";
 
 export interface RecordAttendanceRequest {
   employeeId: number;
@@ -175,7 +178,7 @@ export const recordAttendance = api<RecordAttendanceRequest, AttendanceRecord>(
     }
     
     // Check if record exists for today
-    const existingRecord = await db.queryRow<AttendanceRecord>`
+    let existingRecord = await db.queryRow<AttendanceRecord>`
       SELECT id, employee_id as "employeeId", date, in_time as "inTime", out_time as "outTime",
              late_minutes as "lateMinutes", early_minutes as "earlyMinutes", 
              total_hours as "totalHours", status, notes,
@@ -206,7 +209,31 @@ export const recordAttendance = api<RecordAttendanceRequest, AttendanceRecord>(
                    total_hours as "totalHours", status, notes,
                    created_at as "createdAt", updated_at as "updatedAt"
         `;
-        return result!;
+        const rec = result!;
+        (async () => {
+          try {
+            const emp = await db.queryRow<{ email: string | null; phone: string | null; name: string }>`
+              SELECT email, phone, name FROM employees WHERE id = ${req.employeeId}
+            `;
+            if (emp) {
+              const flags = getCurrentSystemSettings();
+              if (flags.emailNotifications && emp.email) {
+                await sendEmailIfEnabled(
+                  emp.email,
+                  `Checked in at ${timestamp.toLocaleTimeString()}`,
+                  `Hello ${emp.name}, your check-in has been recorded. Late minutes: ${lateMinutes}.`
+                );
+              }
+              if (flags.whatsappNotifications && emp.phone) {
+                await sendWhatsAppIfEnabled(
+                  emp.phone,
+                  `You checked in at ${timestamp.toLocaleTimeString()}. Late minutes: ${lateMinutes}.`
+                );
+              }
+            }
+          } catch {}
+        })();
+        return rec;
       } else {
         // Create new record
         const result = await db.queryRow<AttendanceRecord>`
@@ -217,12 +244,51 @@ export const recordAttendance = api<RecordAttendanceRequest, AttendanceRecord>(
                    total_hours as "totalHours", status, notes,
                    created_at as "createdAt", updated_at as "updatedAt"
         `;
-        return result!;
+        const rec = result!;
+        (async () => {
+          try {
+            const emp = await db.queryRow<{ email: string | null; phone: string | null; name: string }>`
+              SELECT email, phone, name FROM employees WHERE id = ${req.employeeId}
+            `;
+            if (emp) {
+              const flags = getCurrentSystemSettings();
+              if (flags.emailNotifications && emp.email) {
+                await sendEmailIfEnabled(
+                  emp.email,
+                  `Checked in at ${timestamp.toLocaleTimeString()}`,
+                  `Hello ${emp.name}, your check-in has been recorded. Late minutes: ${lateMinutes}.`
+                );
+              }
+              if (flags.whatsappNotifications && emp.phone) {
+                await sendWhatsAppIfEnabled(
+                  emp.phone,
+                  `You checked in at ${timestamp.toLocaleTimeString()}. Late minutes: ${lateMinutes}.`
+                );
+              }
+            }
+          } catch {}
+        })();
+        return rec;
       }
     } else {
       // Check out
       if (!existingRecord || !existingRecord.inTime) {
-        throw new Error("Employee must check in first");
+        // Fallback: use the latest open record with in_time set and out_time NULL
+        const openRecord = await db.queryRow<AttendanceRecord>`
+          SELECT id, employee_id as "employeeId", date, in_time as "inTime", out_time as "outTime",
+                 late_minutes as "lateMinutes", early_minutes as "earlyMinutes", 
+                 total_hours as "totalHours", status, notes,
+                 created_at as "createdAt", updated_at as "updatedAt"
+          FROM attendance_records
+          WHERE employee_id = ${req.employeeId} AND in_time IS NOT NULL AND out_time IS NULL
+          ORDER BY date DESC, id DESC
+          LIMIT 1
+        `;
+        if (openRecord && openRecord.inTime && !openRecord.outTime) {
+          existingRecord = openRecord;
+        } else {
+          throw new Error("Employee must check in first");
+        }
       }
       
       if (existingRecord.outTime) {
@@ -234,19 +300,44 @@ export const recordAttendance = api<RecordAttendanceRequest, AttendanceRecord>(
       const earlyMinutes = timestamp < workEnd ? 
         Math.floor((workEnd.getTime() - timestamp.getTime()) / (1000 * 60)) : 0;
       
-      const totalHours = (timestamp.getTime() - existingRecord.inTime.getTime()) / (1000 * 60 * 60);
+      const inTime = existingRecord.inTime as Date; // ensured above
       
       const result = await db.queryRow<AttendanceRecord>`
         UPDATE attendance_records 
         SET out_time = ${timestamp}, early_minutes = ${earlyMinutes}, 
-            total_hours = ${totalHours}, notes = ${req.notes}, updated_at = CURRENT_TIMESTAMP
+            total_hours = EXTRACT(EPOCH FROM (${timestamp} - in_time)) / 3600.0, 
+            notes = ${req.notes}, updated_at = CURRENT_TIMESTAMP
         WHERE id = ${existingRecord.id}
         RETURNING id, employee_id as "employeeId", date, in_time as "inTime", out_time as "outTime",
                  late_minutes as "lateMinutes", early_minutes as "earlyMinutes", 
                  total_hours as "totalHours", status, notes,
                  created_at as "createdAt", updated_at as "updatedAt"
       `;
-      return result!;
+      const rec = result!;
+      (async () => {
+        try {
+          const emp = await db.queryRow<{ email: string | null; phone: string | null; name: string }>`
+            SELECT email, phone, name FROM employees WHERE id = ${req.employeeId}
+          `;
+          if (emp) {
+            const flags = getCurrentSystemSettings();
+            if (flags.emailNotifications && emp.email) {
+              await sendEmailIfEnabled(
+                emp.email,
+                `Checked out at ${timestamp.toLocaleTimeString()}`,
+                `Hello ${emp.name}, your check-out has been recorded. Total hours: ${result!.totalHours?.toFixed?.(2) ?? ""}. Early leave minutes: ${earlyMinutes}.`
+              );
+            }
+            if (flags.whatsappNotifications && emp.phone) {
+              await sendWhatsAppIfEnabled(
+                emp.phone,
+                `You checked out at ${timestamp.toLocaleTimeString()}. Total hours: ${result!.totalHours?.toFixed?.(2) ?? ""}. Early leave minutes: ${earlyMinutes}.`
+              );
+            }
+          }
+        } catch {}
+      })();
+      return rec;
     }
   }
 );

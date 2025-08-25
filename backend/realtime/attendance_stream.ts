@@ -62,7 +62,7 @@
 //   }
 // );
 
-import { api, StreamOut } from "encore.dev/api";
+import { api, StreamOut, Query } from "encore.dev/api";
 
 export interface AttendanceUpdate {
   type: "checkin" | "checkout" | "update";
@@ -73,7 +73,7 @@ export interface AttendanceUpdate {
 }
 
 export interface RealtimeHandshake {
-  userId: string;
+  userId: Query<string>;
 }
 
 // Keep track of all connected SSE streams

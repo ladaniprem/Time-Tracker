@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import backend from '../../../backend/client';
+import backend from '../backend';
 import StatsCard from '../components/StatsCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, Clock, AlertTriangle, UserX, TrendingUp } from 'lucide-react';
@@ -33,15 +33,15 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
         <div className="text-sm text-muted-foreground">
-          {new Date().toLocaleDateString('en-US', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
+          {new Date().toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
           })}
         </div>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard
           title="Total Employees"
@@ -70,20 +70,22 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
+        <Card className="h-64">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <TrendingUp className="h-5 w-5" />
               <span>Average Working Hours</span>
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-primary">
-              {stats?.averageWorkingHours || 0}h
+          <CardContent className="flex h-full items-center">
+            <div>
+              <div className="text-5xl font-bold text-foreground">
+                {stats?.averageWorkingHours || 0}h
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                Last 7 days average
+              </p>
             </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              Last 7 days average
-            </p>
           </CardContent>
         </Card>
 
@@ -92,24 +94,27 @@ export default function DashboardPage() {
             <CardTitle>Recent Attendance</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="space-y-4">
               {recentAttendance?.records.slice(0, 5).map((record: { id: string; employeeName: string; inTime: string | null; totalHours: number | null; lateMinutes: number }) => (
                 <div key={record.id} className="flex items-center justify-between">
                   <div>
-                    <p className="font-medium">{record.employeeName}</p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="font-medium text-foreground">{record.employeeName}</p>
+                    <p className="text-xs text-muted-foreground">
                       {record.inTime ? new Date(record.inTime).toLocaleTimeString() : 'Not checked in'}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium">
-                      {record.totalHours ? `${record.totalHours.toFixed(1)}h` : '-'}
-                    </p>
-                    {record.lateMinutes > 0 && (
-                      <p className="text-xs text-red-600">
-                        {record.lateMinutes}m late
+                  <div className="flex items-center gap-4">
+                    <span className="text-muted-foreground">-</span>
+                    <div className="text-right">
+                      <p className="text-sm font-medium">
+                        {record.totalHours ? `${record.totalHours.toFixed(1)}h` : '-'}
                       </p>
-                    )}
+                      {record.lateMinutes > 0 && (
+                        <p className="text-xs text-red-600">
+                          {record.lateMinutes}m late
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import backend from "../../../backend/client";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
+import backend from "../backend";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,40 +8,112 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner"; 
 import AttendanceRecordForm from "../components/AttendanceRecordForm";
 import { Plus, Search, Clock, Calendar } from "lucide-react";
-import type { RecordAttendanceRequest } from "../../../backend/attendance/record_attendance";
+import type { attendance } from "../../encore-client";
+type RecordAttendanceRequest = attendance.RecordAttendanceRequest;
 
 
 
 export default function AttendancePage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [dateFilter, setDateFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState(() => {
+    // Restore last used date filter across refreshes
+    const saved = localStorage.getItem("attendance.dateFilter");
+    return saved || "";
+  });
   const [employeeId, setEmployeeId] = useState("");
   const [attendanceDate, setAttendanceDate] = useState("");
   const [userAttendanceResult, setUserAttendanceResult] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   // Attendance data
-  const { data: attendanceData, isLoading } = useQuery({
+  const {
+    data: attendancePages,
+    isLoading,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ["attendance", dateFilter],
-    queryFn: () =>
+    initialPageParam: { offset: 0, limit: 20 },
+    queryFn: ({ pageParam }) =>
       backend.attendance.listAttendance({
         startDate: dateFilter || undefined,
         endDate: dateFilter || undefined,
+        limit: (pageParam as { limit: number }).limit,
+        offset: (pageParam as { offset: number }).offset,
       }),
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((sum, p: any) => sum + (p?.records?.length || 0), 0);
+      const total = (lastPage as any)?.total || 0;
+      if (loaded >= total) return undefined;
+      return { offset: loaded, limit: 20 };
+    },
   });
+
+  const loadAll = async () => {
+    while (true) {
+      const canLoad = hasNextPage && !isFetchingNextPage;
+      if (!canLoad) break;
+      // eslint-disable-next-line no-await-in-loop
+      await fetchNextPage();
+    }
+  };
 
   // Employee data
   const { data: employeesData } = useQuery({
-    queryKey: ["employees"],
-    queryFn: () => backend.attendance.listEmployees(),
+    queryKey: ["employees", { limit: 1000, offset: 0 }],
+    queryFn: () => backend.attendance.listEmployees({ limit: 1000, offset: 0 }),
   });
 
   // Record attendance mutation
   const recordAttendanceMutation = useMutation({
     mutationFn: (data: RecordAttendanceRequest) =>
       backend.attendance.recordAttendance(data),
-    onSuccess: () => {
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: ["attendance", dateFilter] });
+      const previous = queryClient.getQueryData(["attendance", dateFilter]);
+
+      const flat = (attendancePages?.pages || []).flatMap((p: any) => p?.records || []);
+      const employee = (employeesData?.employees || []).find(
+        (e: any) => (e as { id: number }).id === Number(variables.employeeId)
+      ) as any;
+      const now = variables.timestamp ? new Date(variables.timestamp as any) : new Date();
+
+      const optimisticRecord = {
+        id: `temp-${Date.now()}`,
+        employeeName: employee?.name || "",
+        employeeCode: employee?.employeeId || "",
+        employeeId: Number(variables.employeeId),
+        date: now.toISOString(),
+        inTime: variables.type === "in" ? now.toISOString() : flat.find(r => r.employeeId === Number(variables.employeeId))?.inTime || null,
+        outTime: variables.type === "out" ? now.toISOString() : null,
+        totalHours: null,
+        lateMinutes: 0,
+        earlyMinutes: 0,
+        notes: variables.notes || "",
+      } as any;
+
+      // Prepend into first page
+      queryClient.setQueryData(["attendance", dateFilter], (old: any) => {
+        if (!old) return old;
+        const pages = [...old.pages];
+        if (!pages.length) return old;
+        const first = { ...pages[0] };
+        first.records = [optimisticRecord, ...(first.records || [])];
+        pages[0] = first;
+        return { ...old, pages };
+      });
+
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["attendance", dateFilter], context.previous);
+      }
+      toast.error("Failed to record attendance. Please try again.");
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["attendance"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
       setIsFormOpen(false);
@@ -51,7 +123,7 @@ export default function AttendancePage() {
 
   const getUserAttendanceMutation = useMutation({
     mutationFn: (data: { employeeId: string; date: string }) =>
-      backend.attendance.getAttendance(data),
+      backend.attendance.getUserAttendance(data),
     onSuccess: (data) => {
       setUserAttendanceResult((data as { message: string }).message);
       if ((data as { success: boolean }).success) {
@@ -68,14 +140,25 @@ export default function AttendancePage() {
   });
 
   // Filter records by search
+  const flatRecords = (attendancePages?.pages || []).flatMap((p: any) => p?.records || []);
   const filteredRecords =
-    attendanceData?.records.filter(
+    flatRecords.filter(
       (record: { employeeName: string; employeeCode: string }) =>
         record.employeeName
           .toLowerCase()
           .includes(searchTerm.toLowerCase()) ||
         record.employeeCode.toLowerCase().includes(searchTerm.toLowerCase())
     ) || [];
+
+  // Persist date filter so previously created data shows after refresh
+  // Empty means show all recent records (no date constraint)
+  if (typeof window !== 'undefined') {
+    // Save only when it changes
+    const current = localStorage.getItem("attendance.dateFilter");
+    if (current !== dateFilter) {
+      localStorage.setItem("attendance.dateFilter", dateFilter);
+    }
+  }
 
   const formatTime = (date: Date | string | null) => {
     if (!date) return "-";
@@ -175,7 +258,7 @@ export default function AttendancePage() {
         </div>
         <div className="flex items-center space-x-2 text-sm text-muted-foreground">
           <Clock className="h-4 w-4" />
-          <span>{attendanceData?.total || 0} records</span>
+          <span>{(attendancePages?.pages?.[0] as any)?.total || 0} records</span>
         </div>
       </div>
 
@@ -264,6 +347,25 @@ export default function AttendancePage() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {hasNextPage && (
+        <div className="flex justify-center pt-2">
+          <Button onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+            {isFetchingNextPage ? "Loading..." : "Load More"}
+          </Button>
+          <Button onClick={loadAll} disabled={isFetchingNextPage} variant="secondary" className="ml-2">
+            {isFetchingNextPage ? "Loading..." : "Load All"}
+          </Button>
+        </div>
+      )}
+
+      {hasNextPage && (
+        <div className="flex justify-center pt-2">
+          <Button onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+            {isFetchingNextPage ? "Loading..." : "Load More"}
+          </Button>
         </div>
       )}
 

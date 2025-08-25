@@ -78,6 +78,7 @@ import { api } from "encore.dev/api";
 import { secret } from "encore.dev/config";
 import net from "net";
 import tls from "tls";
+import { getCurrentSystemSettings } from "../settings/system_settings";
 
 const smtpServer = secret("SMTP_SERVER"); 
 const smtpPort = secret("SMTP_PORT");     
@@ -137,18 +138,14 @@ export const sendEmail = api<SendEmailRequest, SendEmailResponse>(
                 await sendSecure(`RCPT TO:<${req.to}>`);
                 await sendSecure(`DATA`);
 
-                const headers = [
-                  `From: ${senderEmail()}`,
-                  `To: ${req.to}`,
-                  `Subject: ${req.subject}`,
-                  `MIME-Version: 1.0`,
-                  `Content-Type: ${req.isHtml ? "text/html" : "text/plain"}; charset=utf-8`,
-                  "",
-                  req.body,
-                  ".",
-                ].join("\r\n");
+                const formatted = formatEmailMessage({
+                  to: req.to,
+                  subject: req.subject,
+                  body: req.body,
+                  isHtml: req.isHtml === true,
+                });
 
-                await sendSecure(headers);
+                await sendSecure(formatted);
                 await sendSecure(`QUIT`);
                 secureSocket!.end();
 
@@ -171,6 +168,81 @@ export const sendEmail = api<SendEmailRequest, SendEmailResponse>(
     });
   }
 );
+
+// Non-HTTP helper for internal calls
+export async function sendEmailIfEnabled(to: string, subject: string, body: string, isHtml?: boolean): Promise<void> {
+  const settings = getCurrentSystemSettings();
+  if (!settings.emailNotifications) return;
+
+  const prefixedSubject = prefixSubjectWithCompany(subject, settings.companyName);
+  await sendEmail({ to, subject: prefixedSubject, body: bodyWithFooter(body, settings.companyName, isHtml === true), isHtml });
+}
+
+function prefixSubjectWithCompany(subject: string, companyName: string): string {
+  const trimmedCompany = (companyName || "").trim();
+  if (!trimmedCompany) return subject;
+  const tag = `[${trimmedCompany}]`;
+  if (subject.startsWith(tag)) return subject;
+  return `${tag} ${subject}`;
+}
+
+function bodyWithFooter(body: string, companyName: string, isHtml: boolean): string {
+  const footerText = `\n\n—\n${companyName || ""} Notifications`;
+  if (!isHtml) {
+    return `${body}${footerText}`;
+  }
+  const htmlFooter = `<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;"/><p style="color:#6b7280;font-size:12px;margin:0;">${escapeHtml(
+    companyName || ""
+  )} Notifications</p>`;
+  const hasHtmlWrapper = /<html[\s\S]*<\/html>/i.test(body);
+  if (hasHtmlWrapper) return injectHtmlFooter(body, htmlFooter);
+  return `<!doctype html><html><head><meta charset="utf-8"/></head><body style="font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;line-height:1.6;color:#111827;">${body}${htmlFooter}</body></html>`;
+}
+
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function injectHtmlFooter(html: string, footer: string): string {
+  const closingBodyIndex = html.toLowerCase().lastIndexOf("</body>");
+  if (closingBodyIndex === -1) return html + footer;
+  return html.slice(0, closingBodyIndex) + footer + html.slice(closingBodyIndex);
+}
+
+function formatEmailMessage(params: { to: string; subject: string; body: string; isHtml: boolean }): string {
+  const settings = getCurrentSystemSettings();
+  const company = (settings.companyName || "").trim();
+  const displayFrom = company ? `${company} <${senderEmail()}>` : `${senderEmail()}`;
+  const contentType = params.isHtml ? "text/html; charset=UTF-8" : "text/plain; charset=UTF-8";
+  const date = new Date().toUTCString();
+  const domain = (senderEmail().split("@")[1] || smtpServer()).trim();
+  const messageId = `<${Date.now()}.${Math.random().toString(36).slice(2)}@${domain}>`;
+
+  const payload = [
+    `From: ${displayFrom}`,
+    `To: ${params.to}`,
+    `Subject: ${params.subject}`,
+    `Date: ${date}`,
+    `Message-ID: ${messageId}`,
+    `MIME-Version: 1.0`,
+    `Content-Type: ${contentType}`,
+    `Content-Transfer-Encoding: 8bit`,
+    "",
+    params.body,
+  ].join("\r\n");
+
+  const dotStuffed = payload
+    .split(/\r?\n/)
+    .map((line: string) => (line.startsWith(".") ? "." + line : line))
+    .join("\r\n");
+
+  return dotStuffed + "\r\n.";
+}
 
 
 // import { api } from "encore.dev/api";

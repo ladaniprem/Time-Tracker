@@ -10,8 +10,9 @@ import { toast } from 'sonner';
 import Enhanced3DCharacter from '../components/Enhanced3DCharacter';
 import { Building2, Eye, EyeOff, Loader2 } from 'lucide-react';
 
-import backend from '../../../backend/client';
-import type { LoginRequest } from '../../../backend/auth/profile';
+import backend from '../backend';
+import type { auth } from '../../encore-client';
+type LoginRequest = auth.LoginRequest;
 
 
 export default function LoginPage() {
