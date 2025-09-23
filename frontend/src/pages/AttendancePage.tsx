@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
-import backend from "../backend";
+import backend, { BASE_URL } from "../backend";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner"; 
 import AttendanceRecordForm from "../components/AttendanceRecordForm";
 import { Plus, Search, Clock, Calendar } from "lucide-react";
+import PageHeader from "../components/PageHeader";
 import type { attendance } from "../../encore-client";
 type RecordAttendanceRequest = attendance.RecordAttendanceRequest;
 
@@ -24,6 +25,7 @@ export default function AttendancePage() {
   const [employeeId, setEmployeeId] = useState("");
   const [attendanceDate, setAttendanceDate] = useState("");
   const [userAttendanceResult, setUserAttendanceResult] = useState<string | null>(null);
+  const [showMyRecent, setShowMyRecent] = useState(false);
   const queryClient = useQueryClient();
 
   // Attendance data
@@ -64,6 +66,45 @@ export default function AttendancePage() {
   const { data: employeesData } = useQuery({
     queryKey: ["employees", { limit: 1000, offset: 0 }],
     queryFn: () => backend.attendance.listEmployees({ limit: 1000, offset: 0 }),
+  });
+
+  // My recent attendance (last 3) for entered employeeId
+  const { data: myRecentData, isFetching: isFetchingMyRecent } = useQuery({
+    queryKey: ["my-recent-attendance", employeeId, showMyRecent],
+    enabled: !!employeeId && showMyRecent,
+    queryFn: () =>
+      backend.attendance.listAttendance({
+        employeeId: Number(employeeId),
+        limit: 100,
+        offset: 0,
+      }),
+  });
+
+  // Realtime: refresh employee view when new attendance arrives for that employee
+  useEffect(() => {
+    if (!showMyRecent || !employeeId) return;
+    const es = new EventSource(`${BASE_URL}/realtime/attendance?userId=ui`);
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data) as { employeeId?: number };
+        if (data && typeof data.employeeId === 'number' && data.employeeId === Number(employeeId)) {
+          queryClient.invalidateQueries({ queryKey: ["my-recent-attendance", employeeId, true] });
+          queryClient.invalidateQueries({ queryKey: ["attendance-summary"] });
+        }
+      } catch {}
+    };
+    es.onerror = () => {
+      es.close();
+    };
+    return () => {
+      es.close();
+    };
+  }, [showMyRecent, employeeId, queryClient]);
+
+  // Employees who have attendance, with totals
+  const { data: attendanceSummary, isLoading: isLoadingSummary } = useQuery({
+    queryKey: ["attendance-summary"],
+    queryFn: () => (fetch(`${BASE_URL}/attendance/summary`).then(r => r.json())),
   });
 
   // Record attendance mutation
@@ -116,6 +157,10 @@ export default function AttendancePage() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["attendance"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["attendance-summary"] });
+      if (employeeId) {
+        queryClient.invalidateQueries({ queryKey: ["my-recent-attendance", employeeId, true] });
+      }
       setIsFormOpen(false);
       toast.success("Attendance has been recorded successfully.");
     },
@@ -194,13 +239,15 @@ export default function AttendancePage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-foreground">Attendance</h1>
-        <Button onClick={() => setIsFormOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Record Attendance
-        </Button>
-      </div>
+      <PageHeader
+        title="Attendance"
+        actions={
+          <Button onClick={() => setIsFormOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Record Attendance
+          </Button>
+        }
+      />
 
       {/* Get User Attendance Section */}
       <Card>
@@ -211,6 +258,11 @@ export default function AttendancePage() {
               placeholder="Your Employee ID"
               value={employeeId}
               onChange={(e) => setEmployeeId(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && employeeId) {
+                  setShowMyRecent(true);
+                }
+              }}
               className="flex-1"
             />
             <Input
@@ -227,10 +279,84 @@ export default function AttendancePage() {
             >
               {getUserAttendanceMutation.isPending ? "Loading..." : "Get Attendance"}
             </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setShowMyRecent(true)}
+              disabled={!employeeId || isFetchingMyRecent}
+            >
+              {isFetchingMyRecent ? "Loading..." : "Search"}
+            </Button>
           </div>
           {userAttendanceResult && (
             <div className="mt-4 p-4 bg-muted rounded-md whitespace-pre-wrap">
               {userAttendanceResult}
+            </div>
+          )}
+
+          {showMyRecent && employeeId && (
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-foreground">Employee Attendance</h3>
+                <span className="text-sm text-muted-foreground">
+                  {(() => {
+                    const total = (myRecentData as any)?.total || 0;
+                    const shown = ((myRecentData as any)?.records || []).length;
+                    return `Results: ${shown} of ${total}`;
+                  })()}
+                </span>
+              </div>
+              <div className="flex justify-end mb-2">
+                <Button variant="outline" size="sm" onClick={() => { setShowMyRecent(false); setEmployeeId(""); }}>
+                  Clear
+                </Button>
+              </div>
+              <div className="space-y-3">
+                {((myRecentData as any)?.records || []).map((record: any) => (
+                  <Card key={record.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium text-foreground">
+                            {record.employeeName} <span className="text-muted-foreground">({record.employeeCode})</span>
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {(() => {
+                              const d = new Date(record.date);
+                              const day = d.getDate();
+                              const month = d.getMonth() + 1;
+                              const year = d.getFullYear();
+                              return `${day}/${month}/${year}`;
+                            })()}
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-6">
+                          <div className="text-center">
+                            <div className="text-xs text-muted-foreground">In</div>
+                            <div className="font-medium">
+                              {record.inTime ? (() => {
+                                const t = new Date(record.inTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                return t.replace('AM','am').replace('PM','pm');
+                              })() : '-'}
+                            </div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-xs text-muted-foreground">Out</div>
+                            <div className="font-medium">
+                              {record.outTime ? (() => {
+                                const t = new Date(record.outTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                return t.replace('AM','am').replace('PM','pm');
+                              })() : '-'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                {((myRecentData as any)?.records || []).length === 0 && (
+                  <div className="text-sm text-muted-foreground">No recent records.</div>
+                )}
+              </div>
             </div>
           )}
         </CardContent>
@@ -262,15 +388,46 @@ export default function AttendancePage() {
         </div>
       </div>
 
-      {/* Loading state */}
-      {isLoading ? (
+      {/* Loading state (hidden when showing employee-specific results) */}
+      {isLoading && !showMyRecent ? (
         <div className="space-y-4">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="h-20 bg-muted animate-pulse rounded-lg" />
           ))}
         </div>
-      ) : (
+      ) : (!showMyRecent ? (
         <div className="space-y-4">
+          {/* Employees with attendance */}
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-foreground">Employees with Attendance</h2>
+                <span className="text-sm text-muted-foreground">Total: {(attendanceSummary as any)?.total || 0}</span>
+              </div>
+              {isLoadingSummary ? (
+                <div className="space-y-2">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="h-10 bg-muted animate-pulse rounded" />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {((attendanceSummary as any)?.summaries || []).map((s: any) => (
+                    <div key={s.employeeId} className="flex items-center justify-between text-sm">
+                      <div className="text-foreground">
+                        {s.employeeName} <span className="text-muted-foreground">({s.employeeCode})</span>
+                      </div>
+                      <div className="text-muted-foreground">{s.total} records</div>
+                    </div>
+                  ))}
+                  {((attendanceSummary as any)?.summaries || []).length === 0 && (
+                    <div className="text-sm text-muted-foreground">No employees with attendance yet.</div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {filteredRecords.map((record: { 
             id: string;
             employeeName: string;
@@ -348,7 +505,7 @@ export default function AttendancePage() {
             </Card>
           ))}
         </div>
-      )}
+      ) : null)}
 
       {hasNextPage && (
         <div className="flex justify-center pt-2">

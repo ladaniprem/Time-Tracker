@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner'; // Correct import for Sonner
 import { Settings, Clock, Globe, Bell, Shield } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
 import backend from '../backend';
 import type { settings } from '../../encore-client';
 type UpdateAttendanceSettingsRequest = settings.UpdateAttendanceSettingsRequest;
@@ -167,13 +168,10 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-foreground">Settings</h1>
-        <div className="flex items-center space-x-2">
-          <Settings className="h-5 w-5 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">System Configuration</span>
-        </div>
-      </div>
+      <PageHeader
+        title="Settings"
+        subtitle="System configuration and preferences"
+      />
 
       <Tabs defaultValue="attendance" className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
@@ -209,7 +207,7 @@ export default function SettingsPage() {
                 </div>
               ) : (
                 <form onSubmit={handleAttendanceSubmit} className="space-y-6">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="workStartTime">Work Start Time</Label>
                       <Input
@@ -230,7 +228,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="lateThresholdMinutes">Late Threshold (minutes)</Label>
                       <Input
@@ -251,7 +249,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="workingDaysPerWeek">Working Days Per Week</Label>
                       <Select 
@@ -259,7 +257,7 @@ export default function SettingsPage() {
                         onValueChange={(value) => updateAttendanceField('workingDaysPerWeek', parseInt(value))}
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select days" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="5">5 Days</SelectItem>
@@ -280,7 +278,7 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between rounded-md border border-border p-3">
                       <div className="space-y-0.5">
                         <Label>Overtime Enabled</Label>
                         <p className="text-sm text-muted-foreground">
@@ -305,9 +303,11 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <Button type="submit" disabled={updateAttendanceMutation.isPending}>
-                    {updateAttendanceMutation.isPending ? 'Saving...' : 'Save Attendance Settings'}
-                  </Button>
+                  <div className="flex justify-end">
+                    <Button type="submit" disabled={updateAttendanceMutation.isPending}>
+                      {updateAttendanceMutation.isPending ? 'Saving...' : 'Save Attendance Settings'}
+                    </Button>
+                  </div>
                 </form>
               )}
             </CardContent>
@@ -337,7 +337,7 @@ export default function SettingsPage() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="timezone">Timezone</Label>
                       <Select 
@@ -345,7 +345,7 @@ export default function SettingsPage() {
                         onValueChange={(value) => updateSystemField('timezone', value)}
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select timezone" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="UTC">UTC</SelectItem>
@@ -363,7 +363,7 @@ export default function SettingsPage() {
                         onValueChange={(value) => updateSystemField('language', value)}
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select language" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="en">English</SelectItem>
@@ -375,7 +375,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="dateFormat">Date Format</Label>
                       <Select 
@@ -383,7 +383,7 @@ export default function SettingsPage() {
                         onValueChange={(value) => updateSystemField('dateFormat', value)}
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select date format" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
@@ -399,7 +399,7 @@ export default function SettingsPage() {
                         onValueChange={(value) => updateSystemField('timeFormat', value)}
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select time format" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="12h">12 Hour</SelectItem>
@@ -414,7 +414,7 @@ export default function SettingsPage() {
                         onValueChange={(value) => updateSystemField('currency', value)}
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select currency" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="USD">USD</SelectItem>
@@ -426,9 +426,11 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
+                <div className="flex justify-end">
                   <Button type="submit" disabled={updateSystemMutation.isPending}>
                     {updateSystemMutation.isPending ? 'Saving...' : 'Save System Settings'}
                   </Button>
+                </div>
                 </form>
               )}
             </CardContent>
@@ -443,7 +445,7 @@ export default function SettingsPage() {
             <CardContent>
               <form onSubmit={handleSystemSubmit} className="space-y-6">
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between rounded-md border border-border p-3">
                     <div className="space-y-0.5">
                       <Label>Email Notifications</Label>
                       <p className="text-sm text-muted-foreground">
@@ -456,7 +458,7 @@ export default function SettingsPage() {
                     />
                   </div>
 
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between rounded-md border border-border p-3">
                     <div className="space-y-0.5">
                       <Label>SMS Notifications</Label>
                       <p className="text-sm text-muted-foreground">
@@ -469,7 +471,7 @@ export default function SettingsPage() {
                     />
                   </div>
 
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between rounded-md border border-border p-3">
                     <div className="space-y-0.5">
                       <Label>WhatsApp Notifications</Label>
                       <p className="text-sm text-muted-foreground">
@@ -483,9 +485,11 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <Button type="submit" disabled={updateSystemMutation.isPending}>
-                  {updateSystemMutation.isPending ? 'Saving...' : 'Save Notification Settings'}
-                </Button>
+                <div className="flex justify-end">
+                  <Button type="submit" disabled={updateSystemMutation.isPending}>
+                    {updateSystemMutation.isPending ? 'Saving...' : 'Save Notification Settings'}
+                  </Button>
+                </div>
               </form>
             </CardContent>
           </Card>
@@ -499,7 +503,7 @@ export default function SettingsPage() {
             <CardContent>
               <form onSubmit={handleSystemSubmit} className="space-y-6">
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between rounded-md border border-border p-3">
                     <div className="space-y-0.5">
                       <Label>Automatic Backup</Label>
                       <p className="text-sm text-muted-foreground">
@@ -541,9 +545,11 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <Button type="submit" disabled={updateSystemMutation.isPending}>
-                  {updateSystemMutation.isPending ? 'Saving...' : 'Save Security Settings'}
-                </Button>
+                <div className="flex justify-end">
+                  <Button type="submit" disabled={updateSystemMutation.isPending}>
+                    {updateSystemMutation.isPending ? 'Saving...' : 'Save Security Settings'}
+                  </Button>
+                </div>
               </form>
             </CardContent>
           </Card>

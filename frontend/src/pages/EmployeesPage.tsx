@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import EmployeeForm from '../components/EmployeeForm';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { Plus, Search, Users, Mail, Phone, Edit, Trash2 } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
 import type { attendance } from '../../encore-client';
 type Employee = attendance.Employee;
 
@@ -27,14 +28,25 @@ export default function EmployeesPage() {
     hasNextPage,
     fetchNextPage,
     isFetchingNextPage,
+    error,
   } = useInfiniteQuery({
     queryKey: ['employees'],
     initialPageParam: { offset: 0, limit: 30 },
-    queryFn: ({ pageParam }) =>
-      backend.attendance.listEmployees({
-        limit: (pageParam as { limit: number }).limit,
-        offset: (pageParam as { offset: number }).offset,
-      }),
+    queryFn: async ({ pageParam }) => {
+      console.log('Fetching employees with params:', pageParam);
+      console.log('Backend URL:', backend);
+      try {
+        const result = await backend.attendance.listEmployees({
+          limit: (pageParam as { limit: number }).limit,
+          offset: (pageParam as { offset: number }).offset,
+        });
+        console.log('API response:', result);
+        return result;
+      } catch (err) {
+        console.error('API error:', err);
+        throw err;
+      }
+    },
     getNextPageParam: (lastPage, allPages) => {
       const totalLoaded = allPages.reduce((sum, p: any) => sum + (p?.employees?.length || 0), 0);
       const total = (lastPage as any)?.total || 0;
@@ -46,23 +58,7 @@ export default function EmployeesPage() {
   const createEmployeeMutation = useMutation({
     mutationFn: (data: CreateEmployeeRequest) => backend.attendance.createEmployee(data),
     onSuccess: (created) => {
-      // Optimistically add to first page of infinite query cache
-      queryClient.setQueryData(['employees'], (oldData: any) => {
-        if (!oldData || !Array.isArray(oldData.pages) || oldData.pages.length === 0) return oldData;
-        const pages = [...oldData.pages];
-        const first = { ...pages[0] };
-        const list = Array.isArray(first.employees) ? first.employees : [];
-        const exists = list.some((e: any) => (e as { id: number }).id === (created as { id: number }).id);
-        first.employees = exists ? list : [created, ...list];
-        // bump total on first page metadata if present
-        if (typeof first.total === 'number' && !exists) {
-          first.total = first.total + 1;
-        }
-        pages[0] = first;
-        return { ...oldData, pages };
-      });
-
-      // Refetch to ensure server consistency
+      // Invalidate and refetch to ensure data consistency
       queryClient.invalidateQueries({ queryKey: ['employees'] });
       setIsFormOpen(false);
       toast.success("Employee created", { description: "New employee has been added successfully." });
@@ -186,23 +182,46 @@ export default function EmployeesPage() {
   };
 
   const flatEmployees = (employeesPages?.pages || []).flatMap((p: any) => p?.employees || []);
+  
+  // Debug logging
+  console.log('employeesPages:', employeesPages);
+  console.log('flatEmployees:', flatEmployees);
+  
   const filteredEmployees = flatEmployees
     .filter((employee) => (employee as any)?.id != null)
     .filter(employee =>
-    ((employee as { name?: string }).name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ((employee as { employeeId?: string }).employeeId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ((employee as { email?: string }).email || '').toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+      ((employee as { name?: string }).name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ((employee as { employeeId?: string }).employeeId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ((employee as { email?: string }).email || '').toLowerCase().includes(searchTerm.toLowerCase())
+    ) || [];
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-foreground">Employees</h1>
-        <Button onClick={() => setIsFormOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Employee
-        </Button>
-      </div>
+      <PageHeader
+        title="Employees"
+        subtitle="Manage your team and their details"
+        actions={
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={async () => {
+                try {
+                  const result = await backend.attendance.listEmployees({ limit: 5, offset: 0 });
+                  toast.success('API test successful', { description: `Found ${result.employees.length} employees` });
+                } catch (err: any) {
+                  toast.error('API test failed', { description: err?.message });
+                }
+              }}
+            >
+              Test API
+            </Button>
+            <Button onClick={() => setIsFormOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Employee
+            </Button>
+          </div>
+        }
+      />
 
       <div className="flex items-center space-x-4">
         <div className="relative flex-1 max-w-sm">
@@ -217,10 +236,21 @@ export default function EmployeesPage() {
         <div className="flex items-center space-x-2 text-sm text-muted-foreground">
           <Users className="h-4 w-4" />
           <span>{(employeesPages?.pages?.[0] as any)?.total || 0} employees</span>
+          <span className="text-xs">(Loaded: {flatEmployees.length})</span>
         </div>
       </div>
 
-      {isLoading ? (
+      {error ? (
+        <div className="text-center py-12">
+          <div className="text-red-600 mb-4">
+            <h3 className="text-lg font-medium">Error loading employees</h3>
+            <p className="text-sm">{error.message}</p>
+          </div>
+          <Button onClick={() => window.location.reload()}>
+            Retry
+          </Button>
+        </div>
+      ) : isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[...Array(6)].map((_, i) => (
             <div key={i} className="h-48 bg-muted animate-pulse rounded-lg" />
